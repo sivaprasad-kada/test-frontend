@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Link2, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const transition = { duration: 0.5, ease: [0.25, 0.1, 0.25, 1] };
+const transition = { duration: 0.5, ease: [0.25, 0.1, 0.25, 1] as const };
 
 const HeroSection = () => {
   const [url, setUrl] = useState("");
