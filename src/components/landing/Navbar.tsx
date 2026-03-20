@@ -1,8 +1,11 @@
 import { Link } from "react-router-dom";
 import { Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/AuthContext";
 
 const Navbar = () => {
+  const { user } = useAuth();
+
   return (
     <nav className="flex items-center justify-between px-6 md:px-8 h-16 max-w-7xl mx-auto">
       <Link to="/" className="flex items-center gap-2 font-bold text-xl tracking-tight">
@@ -18,12 +21,20 @@ const Navbar = () => {
         <Link to="/" className="hover:text-foreground transition-colors">Enterprise</Link>
       </div>
       <div className="hidden md:flex items-center gap-3">
-        <Link to="/login">
-          <Button variant="ghost" size="sm">Log in</Button>
-        </Link>
-        <Link to="/login">
-          <Button size="sm">Sign Up Free</Button>
-        </Link>
+        {user ? (
+          <Link to="/dashboard">
+            <Button size="sm">Dashboard</Button>
+          </Link>
+        ) : (
+          <>
+            <Link to="/login">
+              <Button variant="ghost" size="sm">Log in</Button>
+            </Link>
+            <Link to="/login">
+              <Button size="sm">Sign Up Free</Button>
+            </Link>
+          </>
+        )}
       </div>
     </nav>
   );

@@ -1,163 +1,306 @@
-import { MousePointerClick, Users, Share2, Globe, TrendingUp, Calendar, Download } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { MousePointerClick, Users, Globe, Loader2, ArrowLeft, Monitor, Smartphone } from "lucide-react";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { Button } from "@/components/ui/button";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
+import api from "@/api/axios";
 
-const chartData = [
-  { date: "Jun 01", current: 800, last: 400 },
-  { date: "Jun 07", current: 2200, last: 900 },
-  { date: "Jun 14", current: 4800, last: 1800 },
-  { date: "Jun 21", current: 7200, last: 3200 },
-  { date: "Jun 28", current: 9800, last: 4500 },
-  { date: "Jul 01", current: 12430, last: 5800 },
-];
+interface AnalyticsEntry {
+  _id: string;
+  shortId: string;
+  date: string;
+  totalClicks: number;
+  uniqueVisitors: number;
+  countries: Record<string, number>;
+  browsers: Record<string, number>;
+  devices: Record<string, number>;
+}
 
-const stats = [
-  { label: "Total Clicks", value: "12,430", change: "+12.4%", icon: MousePointerClick, color: "bg-primary/10 text-primary" },
-  { label: "Unique Visitors", value: "8,210", change: "+5.2%", icon: Users, color: "bg-primary/10 text-primary" },
-  { label: "Top Referral", value: "Twitter", sub: "42% of total traffic", icon: Share2, color: "bg-primary/10 text-primary" },
-  { label: "Top Location", value: "USA", sub: "3,120 clicks (25%)", icon: Globe, color: "bg-primary/10 text-primary" },
-];
-
-const referrers = [
-  { name: "Twitter / X", icon: Share2, clicks: "5,220", pct: "42.0%", bar: 84 },
-  { name: "Facebook", icon: Users, clicks: "2,860", pct: "23.0%", bar: 46 },
-  { name: "Instagram", icon: MousePointerClick, clicks: "1,990", pct: "16.0%", bar: 32 },
-  { name: "Email / Direct", icon: Globe, clicks: "2,360", pct: "19.0%", bar: 38 },
-];
-
-const locations = [
-  { country: "United States", flag: "🇺🇸", clicks: "3,120", pct: "25.1%" },
-  { country: "United Kingdom", flag: "🇬🇧", clicks: "2,110", pct: "17.0%" },
-  { country: "Germany", flag: "🇩🇪", clicks: "1,490", pct: "12.0%" },
-  { country: "India", flag: "🇮🇳", clicks: "1,240", pct: "10.0%" },
-];
+interface UrlItem {
+  _id: string;
+  shortId: string;
+  longUrl: string;
+  clicks: number;
+}
 
 const AnalyticsPage = () => {
+  const { shortId } = useParams<{ shortId: string }>();
+  const navigate = useNavigate();
+
+  const [analytics, setAnalytics] = useState<AnalyticsEntry[]>([]);
+  const [urlInfo, setUrlInfo] = useState<UrlItem | null>(null);
+  const [urls, setUrls] = useState<UrlItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // Fetch all user URLs for the selector view
+  const fetchUserUrls = async () => {
+    try {
+      const res = await api.get("/url");
+      setUrls(res.data);
+    } catch (err: any) {
+      if (err.response?.status === 401) navigate("/login");
+    }
+  };
+
+  // Fetch analytics for a specific shortId
+  const fetchAnalytics = async (id: string) => {
+    setLoading(true);
+    setError("");
+    try {
+      const [analyticsRes, urlsRes] = await Promise.all([
+        api.get(`/url/${id}/analytics`),
+        api.get("/url"),
+      ]);
+      setAnalytics(analyticsRes.data);
+      setUrls(urlsRes.data);
+      const found = urlsRes.data.find((u: UrlItem) => u.shortId === id);
+      setUrlInfo(found || null);
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        navigate("/login");
+      } else {
+        setError("Failed to load analytics data.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (shortId) {
+      fetchAnalytics(shortId);
+    } else {
+      fetchUserUrls().then(() => setLoading(false));
+    }
+  }, [shortId]);
+
+  // Aggregate analytics across all entries
+  const totalClicks = analytics.reduce((s, a) => s + a.totalClicks, 0);
+  const totalUnique = analytics.reduce((s, a) => s + a.uniqueVisitors, 0);
+
+  const allCountries: Record<string, number> = {};
+  const allBrowsers: Record<string, number> = {};
+  const allDevices: Record<string, number> = {};
+
+  analytics.forEach((a) => {
+    Object.entries(a.countries || {}).forEach(([k, v]) => {
+      allCountries[k] = (allCountries[k] || 0) + v;
+    });
+    Object.entries(a.browsers || {}).forEach(([k, v]) => {
+      allBrowsers[k] = (allBrowsers[k] || 0) + v;
+    });
+    Object.entries(a.devices || {}).forEach(([k, v]) => {
+      allDevices[k] = (allDevices[k] || 0) + v;
+    });
+  });
+
+  const chartData = analytics
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((a) => ({
+      date: a.date,
+      clicks: a.totalClicks,
+      visitors: a.uniqueVisitors,
+    }));
+
+  const countryData = Object.entries(allCountries)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([name, clicks]) => ({ name, clicks }));
+
+  const browserData = Object.entries(allBrowsers)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([name, clicks]) => ({ name, clicks }));
+
+  const deviceData = Object.entries(allDevices)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([name, clicks]) => ({ name, clicks }));
+
+  // If no shortId provided, show URL selector
+  if (!shortId) {
+    return (
+      <div className="flex min-h-screen bg-background">
+        <DashboardSidebar />
+        <main className="flex-1 p-6 md:p-10 overflow-auto">
+          <h1 className="text-3xl font-black text-foreground mb-2">Analytics</h1>
+          <p className="text-muted-foreground mb-8">Select a link to view its analytics</p>
+
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <Loader2 size={32} className="animate-spin text-primary" />
+            </div>
+          ) : urls.length === 0 ? (
+            <div className="text-center py-16">
+              <MousePointerClick size={48} className="mx-auto text-muted-foreground/40 mb-4" />
+              <p className="text-muted-foreground mb-4">No links found. Create one first!</p>
+              <Button onClick={() => navigate("/shortener")}>Create a Link</Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {urls.map((u) => (
+                <button
+                  key={u._id}
+                  onClick={() => navigate(`/analytics/${u.shortId}`)}
+                  className="bg-card rounded-xl border border-border shadow-card p-5 text-left hover:border-primary/50 hover:shadow-md transition-all group"
+                >
+                  <p className="text-primary font-bold text-sm group-hover:underline">{u.shortId}</p>
+                  <p className="text-xs text-muted-foreground mt-1 truncate" title={u.longUrl}>{u.longUrl}</p>
+                  <div className="flex items-center gap-2 mt-3">
+                    <MousePointerClick size={14} className="text-muted-foreground" />
+                    <span className="text-sm font-semibold text-foreground">{u.clicks?.toLocaleString() || 0} clicks</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen bg-background">
       <DashboardSidebar />
       <main className="flex-1 p-6 md:p-10 overflow-auto">
-        <div className="mb-2">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
-            LINKS &gt; SHORTLY.IO/XK92P
-          </p>
+        <div className="mb-4">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/analytics")} className="gap-2 text-muted-foreground">
+            <ArrowLeft size={16} /> Back to Links
+          </Button>
         </div>
+
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-black text-foreground">Analytics for shortly.io/xK92p</h1>
-            <p className="text-muted-foreground mt-1">Real-time performance tracking for your marketing campaign</p>
-          </div>
-          <div className="flex gap-3">
-            <Button variant="outline" className="gap-2">
-              <Calendar size={16} /> Last 30 Days
-            </Button>
-            <Button className="gap-2">
-              <Download size={16} /> Export Report
-            </Button>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1">
+              LINKS &gt; {shortId}
+            </p>
+            <h1 className="text-3xl font-black text-foreground">Analytics for {shortId}</h1>
+            {urlInfo && (
+              <p className="text-muted-foreground mt-1 text-sm truncate max-w-lg" title={urlInfo.longUrl}>
+                → {urlInfo.longUrl}
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {stats.map((stat) => (
-            <div key={stat.label} className="bg-card rounded-xl border border-border shadow-card p-5">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs text-muted-foreground">{stat.label}</p>
-                <div className={`w-8 h-8 rounded-lg ${stat.color} flex items-center justify-center`}>
-                  <stat.icon size={16} />
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 size={32} className="animate-spin text-primary" />
+          </div>
+        ) : error ? (
+          <p className="text-destructive text-center py-16">{error}</p>
+        ) : analytics.length === 0 ? (
+          <div className="text-center py-16">
+            <MousePointerClick size={48} className="mx-auto text-muted-foreground/40 mb-4" />
+            <p className="text-lg font-semibold text-foreground mb-1">No analytics yet</p>
+            <p className="text-muted-foreground">This link hasn't received any clicks. Share it to start tracking!</p>
+          </div>
+        ) : (
+          <>
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              {[
+                { label: "Total Clicks", value: totalClicks.toLocaleString(), icon: MousePointerClick },
+                { label: "Unique Visitors", value: totalUnique.toLocaleString(), icon: Users },
+                { label: "Top Country", value: countryData[0]?.name || "N/A", icon: Globe },
+                { label: "Top Device", value: deviceData[0]?.name || "N/A", icon: Monitor },
+              ].map((stat) => (
+                <div key={stat.label} className="bg-card rounded-xl border border-border shadow-card p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                      <stat.icon size={16} />
+                    </div>
+                  </div>
+                  <p className="text-2xl font-black text-foreground">{stat.value}</p>
                 </div>
+              ))}
+            </div>
+
+            {/* Clicks Chart */}
+            {chartData.length > 0 && (
+              <div className="bg-card rounded-xl border border-border shadow-card p-6 mb-8">
+                <h3 className="text-lg font-bold text-foreground mb-1">Click Traffic Over Time</h3>
+                <p className="text-sm text-muted-foreground mb-6">Daily click and visitor counts</p>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={chartData}>
+                    <defs>
+                      <linearGradient id="colorCurrent" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(243, 75%, 59%)" stopOpacity={0.15} />
+                        <stop offset="95%" stopColor="hsl(243, 75%, 59%)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 91%)" />
+                    <XAxis dataKey="date" tick={{ fontSize: 12, fill: 'hsl(220, 8.9%, 46.1%)' }} />
+                    <YAxis tick={{ fontSize: 12, fill: 'hsl(220, 8.9%, 46.1%)' }} />
+                    <Tooltip />
+                    <Area type="monotone" dataKey="visitors" stroke="hsl(220, 8.9%, 46.1%)" strokeWidth={1.5} strokeDasharray="4 4" fill="transparent" />
+                    <Area type="monotone" dataKey="clicks" stroke="hsl(243, 75%, 59%)" strokeWidth={2.5} fill="url(#colorCurrent)" />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
-              <p className="text-2xl font-black text-foreground">{stat.value}</p>
-              {stat.change && (
-                <p className="text-xs mt-1">
-                  <span className="text-success font-semibold">↗ {stat.change}</span>
-                  <span className="text-muted-foreground ml-1">vs last month</span>
-                </p>
+            )}
+
+            {/* Bottom row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Countries */}
+              {countryData.length > 0 && (
+                <div className="bg-card rounded-xl border border-border shadow-card p-6">
+                  <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+                    <Globe size={18} /> Countries
+                  </h3>
+                  <div className="space-y-3">
+                    {countryData.map((c) => (
+                      <div key={c.name} className="flex items-center justify-between">
+                        <span className="text-sm text-foreground">{c.name}</span>
+                        <span className="text-sm font-bold text-foreground">{c.clicks}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
-              {stat.sub && <p className="text-xs text-muted-foreground mt-1">{stat.sub}</p>}
-            </div>
-          ))}
-        </div>
 
-        {/* Chart */}
-        <div className="bg-card rounded-xl border border-border shadow-card p-6 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-bold text-foreground">Click Traffic Over Time</h3>
-              <p className="text-sm text-muted-foreground">Cumulative growth of audience engagement</p>
-            </div>
-            <div className="flex items-center gap-4 text-xs">
-              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-primary" /> Current Period</span>
-              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-muted-foreground/30" /> Last Period</span>
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={chartData}>
-              <defs>
-                <linearGradient id="colorCurrent" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(243, 75%, 59%)" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="hsl(243, 75%, 59%)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 91%)" />
-              <XAxis dataKey="date" tick={{ fontSize: 12, fill: 'hsl(220, 8.9%, 46.1%)' }} />
-              <YAxis tick={{ fontSize: 12, fill: 'hsl(220, 8.9%, 46.1%)' }} />
-              <Tooltip />
-              <Area type="monotone" dataKey="last" stroke="hsl(220, 8.9%, 46.1%)" strokeWidth={1.5} strokeDasharray="4 4" fill="transparent" />
-              <Area type="monotone" dataKey="current" stroke="hsl(243, 75%, 59%)" strokeWidth={2.5} fill="url(#colorCurrent)" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Bottom row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Referrers */}
-          <div className="bg-card rounded-xl border border-border shadow-card p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold text-foreground">Top Referrers</h3>
-              <a href="#" className="text-sm text-primary font-medium hover:underline">View All</a>
-            </div>
-            <div className="space-y-5">
-              {referrers.map((r) => (
-                <div key={r.name} className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-primary/5 flex items-center justify-center">
-                    <r.icon size={18} className="text-primary" />
-                  </div>
-                  <span className="flex-1 text-sm font-medium text-foreground">{r.name}</span>
-                  <div className="text-right mr-4">
-                    <p className="text-sm font-bold text-foreground">{r.clicks}</p>
-                    <p className="text-xs text-muted-foreground">{r.pct}</p>
-                  </div>
-                  <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full" style={{ width: `${r.bar}%` }} />
+              {/* Browsers */}
+              {browserData.length > 0 && (
+                <div className="bg-card rounded-xl border border-border shadow-card p-6">
+                  <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+                    <Monitor size={18} /> Browsers
+                  </h3>
+                  <div className="space-y-3">
+                    {browserData.map((b) => (
+                      <div key={b.name} className="flex items-center justify-between">
+                        <span className="text-sm text-foreground">{b.name}</span>
+                        <span className="text-sm font-bold text-foreground">{b.clicks}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
+              )}
 
-          {/* Geographic */}
-          <div className="bg-card rounded-xl border border-border shadow-card p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold text-foreground">Geographic Distribution</h3>
-              <a href="#" className="text-sm text-primary font-medium hover:underline">Full Map</a>
-            </div>
-            <div className="space-y-5">
-              {locations.map((loc) => (
-                <div key={loc.country} className="flex items-center gap-4">
-                  <span className="text-2xl">{loc.flag}</span>
-                  <span className="flex-1 text-sm font-medium text-foreground">{loc.country}</span>
-                  <p className="text-sm font-bold text-foreground">{loc.clicks}</p>
-                  <p className="text-sm text-muted-foreground">{loc.pct}</p>
+              {/* Devices */}
+              {deviceData.length > 0 && (
+                <div className="bg-card rounded-xl border border-border shadow-card p-6">
+                  <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+                    <Smartphone size={18} /> Devices
+                  </h3>
+                  <div className="space-y-3">
+                    {deviceData.map((d) => (
+                      <div key={d.name} className="flex items-center justify-between">
+                        <span className="text-sm text-foreground">{d.name}</span>
+                        <span className="text-sm font-bold text-foreground">{d.clicks}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
+              )}
             </div>
-          </div>
-        </div>
+          </>
+        )}
 
         <footer className="mt-12 py-6 border-t border-border text-center">
-          <p className="text-xs text-muted-foreground">© 2024 Shortly Inc. All rights reserved. Precise tracking provided by GlobalLink Engine.</p>
+          <p className="text-xs text-muted-foreground">© 2024 Shortly Inc. All rights reserved.</p>
         </footer>
       </main>
     </div>

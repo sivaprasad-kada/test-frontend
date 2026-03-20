@@ -1,10 +1,69 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Link2, Eye, EyeOff, Check, Zap, Shield, RefreshCw } from "lucide-react";
+import { Link, useNavigate, Navigate } from "react-router-dom";
+import { Link2, Eye, EyeOff, Zap, Shield, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/AuthContext";
+import { FcGoogle } from "react-icons/fc";
+import { FaGithub } from "react-icons/fa";
 
 const LoginPage = () => {
+  const { user, login, register } = useAuth();
+  const navigate = useNavigate();
+
+  const [isLogin, setIsLogin] = useState(true);
+
+  // Login state
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  // Register state
+  const [regName, setRegName] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regError, setRegError] = useState("");
+  const [regLoading, setRegLoading] = useState(false);
+
+  // If already logged in, redirect to dashboard
+  if (user) return <Navigate to="/dashboard" replace />;
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError("");
+    setLoginLoading(true);
+    try {
+      await login(loginEmail, loginPassword);
+      navigate("/dashboard");
+    } catch (err: any) {
+      setLoginError(err.response?.data?.error || "Login failed. Please try again.");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRegError("");
+    if (regPassword.length < 6) {
+      setRegError("Password must be at least 6 characters.");
+      return;
+    }
+    setRegLoading(true);
+    try {
+      await register(regName, regEmail, regPassword);
+      navigate("/dashboard");
+    } catch (err: any) {
+      setRegError(err.response?.data?.error || "Registration failed. Please try again.");
+    } finally {
+      setRegLoading(false);
+    }
+  };
+
+  const handleOAuth = (provider: "google" | "github") => {
+    window.location.href = `http://localhost:5000/api/auth/${provider}`;
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -21,19 +80,21 @@ const LoginPage = () => {
         </div>
       </nav>
 
-      <div className="max-w-5xl mx-auto px-6 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Login */}
-          <div className="bg-card rounded-2xl border border-border shadow-card p-10">
+      <div className="w-full max-w-md mx-auto px-6 py-16">
+        {isLogin ? (
+          <div className="bg-card rounded-2xl border border-border shadow-card p-10 animate-in fade-in zoom-in-95 duration-300">
             <h2 className="text-3xl font-black text-foreground mb-2">Welcome Back</h2>
             <p className="text-muted-foreground mb-8">Continue your journey with Shortly.</p>
 
-            <div className="space-y-5">
+            <form onSubmit={handleLogin} className="space-y-5">
               <div>
                 <label className="text-sm font-semibold text-foreground mb-2 block">Email Address</label>
                 <input
                   type="email"
                   placeholder="name@company.com"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  required
                   className="w-full h-12 px-4 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring text-sm"
                 />
               </div>
@@ -42,10 +103,14 @@ const LoginPage = () => {
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
-                    defaultValue="password123"
+                    placeholder="Enter your password"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    required
                     className="w-full h-12 px-4 pr-12 rounded-lg border border-border bg-background text-foreground outline-none focus:ring-2 focus:ring-ring text-sm"
                   />
                   <button
+                    type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
@@ -53,38 +118,49 @@ const LoginPage = () => {
                   </button>
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <input type="checkbox" className="rounded" />
-                  Remember me
-                </label>
-                <a href="#" className="text-sm text-primary font-medium hover:underline">Forgot password?</a>
-              </div>
-              <Link to="/dashboard">
-                <Button size="lg" className="w-full">Log In</Button>
-              </Link>
-            </div>
+
+              {loginError && (
+                <p className="text-sm text-destructive font-medium bg-destructive/10 rounded-lg px-3 py-2">{loginError}</p>
+              )}
+
+              <Button type="submit" size="lg" className="w-full" disabled={loginLoading}>
+                {loginLoading ? <><Loader2 size={18} className="animate-spin mr-2" /> Logging In...</> : "Log In"}
+              </Button>
+            </form>
 
             <div className="mt-8 pt-6 border-t border-border">
               <p className="text-center text-sm text-muted-foreground mb-4">Or continue with</p>
               <div className="grid grid-cols-2 gap-3">
-                <Button variant="outline" className="h-12">Google</Button>
-                <Button variant="outline" className="h-12">SSO</Button>
+                <Button variant="outline" className="h-12 flex items-center gap-2 font-medium" onClick={() => handleOAuth("google")}>
+                  <FcGoogle className="text-xl" /> Google
+                </Button>
+                <Button variant="outline" className="h-12 flex items-center gap-2 font-medium" onClick={() => handleOAuth("github")}>
+                  <FaGithub className="text-xl" /> GitHub
+                </Button>
               </div>
             </div>
+
+            <div className="mt-8 text-center text-sm text-muted-foreground">
+              Don't have an account?{" "}
+              <button type="button" onClick={() => setIsLogin(false)} className="text-primary font-medium hover:underline">
+                Sign up
+              </button>
+            </div>
           </div>
-
-          {/* Signup */}
-          <div className="bg-card rounded-2xl border border-border shadow-card p-10">
+        ) : (
+          <div className="bg-card rounded-2xl border border-border shadow-card p-10 animate-in fade-in zoom-in-95 duration-300">
             <h2 className="text-3xl font-black text-foreground mb-2">Join Shortly Today</h2>
-            <p className="text-muted-foreground mb-8">Create an account to start your 14-day free trial. No credit card required.</p>
+            <p className="text-muted-foreground mb-8">Create an account to start shortening links. Free forever.</p>
 
-            <div className="space-y-5">
+            <form onSubmit={handleRegister} className="space-y-5">
               <div>
                 <label className="text-sm font-semibold text-foreground mb-2 block">Full Name</label>
                 <input
                   type="text"
                   placeholder="Alex Johnson"
+                  value={regName}
+                  onChange={(e) => setRegName(e.target.value)}
+                  required
                   className="w-full h-12 px-4 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring text-sm"
                 />
               </div>
@@ -93,6 +169,9 @@ const LoginPage = () => {
                 <input
                   type="email"
                   placeholder="alex@company.com"
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  required
                   className="w-full h-12 px-4 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring text-sm"
                 />
               </div>
@@ -101,14 +180,36 @@ const LoginPage = () => {
                 <input
                   type="password"
                   placeholder="Create a strong password"
+                  value={regPassword}
+                  onChange={(e) => setRegPassword(e.target.value)}
+                  required
                   className="w-full h-12 px-4 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring text-sm"
                 />
-                <p className="text-xs text-muted-foreground mt-2">Must be at least 8 characters with one number and one symbol.</p>
+                <p className="text-xs text-muted-foreground mt-2">Must be at least 6 characters.</p>
               </div>
+
+              {regError && (
+                <p className="text-sm text-destructive font-medium bg-destructive/10 rounded-lg px-3 py-2">{regError}</p>
+              )}
+
               <p className="text-xs text-muted-foreground">
                 By clicking "Create Account", you agree to our <a href="#" className="text-primary hover:underline">Terms of Service</a> and <a href="#" className="text-primary hover:underline">Privacy Policy</a>.
               </p>
-              <Button size="lg" className="w-full bg-foreground text-background hover:bg-foreground/90">Create Account</Button>
+              <Button type="submit" size="lg" className="w-full bg-foreground text-background hover:bg-foreground/90" disabled={regLoading}>
+                {regLoading ? <><Loader2 size={18} className="animate-spin mr-2" /> Creating...</> : "Create Account"}
+              </Button>
+            </form>
+
+            <div className="mt-8 pt-6 border-t border-border">
+              <p className="text-center text-sm text-muted-foreground mb-4">Or sign up with</p>
+              <div className="grid grid-cols-2 gap-3">
+                <Button variant="outline" className="h-12 flex items-center gap-2 font-medium" onClick={() => handleOAuth("google")}>
+                  <FcGoogle className="text-xl" /> Google
+                </Button>
+                <Button variant="outline" className="h-12 flex items-center gap-2 font-medium" onClick={() => handleOAuth("github")}>
+                  <FaGithub className="text-xl" /> GitHub
+                </Button>
+              </div>
             </div>
 
             <div className="mt-8 grid grid-cols-3 gap-4 text-center">
@@ -123,8 +224,15 @@ const LoginPage = () => {
                 </div>
               ))}
             </div>
+
+            <div className="mt-8 text-center text-sm text-muted-foreground">
+              Already have an account?{" "}
+              <button type="button" onClick={() => setIsLogin(true)} className="text-primary font-medium hover:underline">
+                Log in
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <footer className="py-8 px-6 text-center border-t border-border">

@@ -1,5 +1,6 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Link2, LayoutGrid, LinkIcon, BarChart3, Settings, LogOut } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 const navItems = [
   { name: "Overview", icon: LayoutGrid, path: "/dashboard" },
@@ -10,6 +11,22 @@ const navItems = [
 
 const DashboardSidebar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/login");
+    } catch {
+      // still redirect
+      navigate("/login");
+    }
+  };
+
+  const initials = user?.name
+    ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "U";
 
   return (
     <aside className="hidden md:flex flex-col w-56 bg-card border-r border-border h-screen sticky top-0 p-4">
@@ -23,7 +40,8 @@ const DashboardSidebar = () => {
 
       <nav className="flex-1 space-y-1">
         {navItems.map((item) => {
-          const active = location.pathname === item.path;
+          const active = location.pathname === item.path ||
+            (item.path === "/analytics" && location.pathname.startsWith("/analytics"));
           return (
             <Link
               key={item.name}
@@ -43,15 +61,15 @@ const DashboardSidebar = () => {
 
       <div className="flex items-center gap-3 px-3 py-3 border-t border-border mt-4 pt-4">
         <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
-          AR
+          {initials}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-foreground truncate">Alex Rivera</p>
-          <p className="text-xs text-muted-foreground">Pro Plan</p>
+          <p className="text-sm font-semibold text-foreground truncate">{user?.name || "User"}</p>
+          <p className="text-xs text-muted-foreground truncate">{user?.email || ""}</p>
         </div>
-        <Link to="/">
-          <LogOut size={16} className="text-muted-foreground hover:text-foreground" />
-        </Link>
+        <button onClick={handleLogout} title="Logout">
+          <LogOut size={16} className="text-muted-foreground hover:text-foreground cursor-pointer" />
+        </button>
       </div>
     </aside>
   );
