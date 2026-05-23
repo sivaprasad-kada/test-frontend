@@ -27,7 +27,6 @@ const DashboardSidebar = () => {
   const initials = user?.name
     ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "U";
-
   return (
     <aside className="hidden md:flex flex-col w-56 bg-card border-r border-border h-screen sticky top-0 p-4">
       <Link to="/" className="flex items-center gap-2 font-bold text-lg mb-1 px-2">

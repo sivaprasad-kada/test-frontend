@@ -3,10 +3,10 @@ import api from "../api/axios";
 
 interface User {
   id: string;
-  _id?: string;
+  _id?: string; // optional property
   name: string;
   email: string;
-  avatar?: string;
+  avatar?: string; // this is also a optional property
   provider?: string;
 }
 
