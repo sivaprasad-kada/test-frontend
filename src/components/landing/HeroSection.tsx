@@ -1,5 +1,5 @@
-import { useState, useRef, Suspense, lazy } from "react";
-import { motion } from "framer-motion";
+import { useState, useRef, Suspense, lazy, useEffect } from "react";
+import { motion, useScroll, useTransform } from "framer-motion";
 import { Link2, ArrowRight, Copy, Check, Zap, BarChart2, Globe } from "lucide-react";
 
 // Lazy-load heavy 3D scene only on landing page
@@ -54,17 +54,36 @@ const HeroSection = () => {
     }
   };
 
+  const { scrollY } = useScroll();
+  const globeX = useTransform(scrollY, [0, 400], [0, -300]);
+  const globeOpacity = useTransform(scrollY, [0, 300], [1, 0]);
+  const globeScale = useTransform(scrollY, [0, 300], [1, 0.8]);
+
+  const [isDesktop, setIsDesktop] = useState(typeof window !== "undefined" ? window.innerWidth >= 1024 : true);
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const textXDesktop = useTransform(scrollY, [0, 400], [0, 250]); // Move right to center
+
   return (
     <section
-      className="relative min-h-screen flex items-center overflow-hidden"
+      className="relative min-h-[calc(100vh-64px)] flex overflow-hidden"
     >
 
       {/* Main content container */}
-      <div className="relative z-10 w-full max-w-7xl mx-auto px-6 md:px-10 lg:px-16 py-28 md:py-32 min-h-screen flex flex-col justify-center">
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-6 md:px-10 lg:px-16 pt-12 md:pt-16 pb-16 md:pb-20 flex flex-col">
         <div className="flex flex-col lg:flex-row items-center lg:items-center gap-12 lg:gap-16">
 
           {/* ── LEFT CONTENT ─────────────────────────── */}
-          <div className="flex-1 flex flex-col items-center lg:items-start text-center lg:text-left max-w-2xl mx-auto lg:mx-0">
+          <motion.div 
+            className="flex-1 flex flex-col items-center lg:items-start text-center lg:text-left max-w-2xl mx-auto lg:mx-0 relative z-20"
+            style={{ x: isDesktop ? textXDesktop : 0 }}
+          >
 
             {/* Badge */}
             <motion.div
@@ -265,17 +284,25 @@ const HeroSection = () => {
                 </div>
               ))}
             </motion.div>
-          </div>
+          </motion.div>
 
           {/* ── RIGHT — 3D GLOBE ────────────────────── */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.9, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            className="flex-1 relative w-full"
-            style={{ height: "600px" }}
+            className="flex-1 relative w-full z-0 pointer-events-none lg:pointer-events-auto"
+            style={{ 
+              height: "500px",
+              x: globeX,
+              opacity: globeOpacity,
+              scale: globeScale
+            }}
           >
-            {/* Soft radial glow behind globe */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.9, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              className="w-full h-full relative"
+            >
+              {/* Soft radial glow behind globe */}
             <div
               className="absolute inset-0 pointer-events-none"
               style={{
@@ -296,6 +323,7 @@ const HeroSection = () => {
             >
               <GlobeScene />
             </Suspense>
+            </motion.div>
           </motion.div>
         </div>
       </div>

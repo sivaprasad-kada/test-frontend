@@ -282,14 +282,13 @@ const Scene = ({
       <ConnectionLines />
 
       {/* Orbit rings at different tilts */}
-      <OrbitRing radius={3.2} speed={0.18} tilt={Math.PI / 4} color="#3b82f6" />
-      <OrbitRing radius={3.7} speed={-0.12} tilt={Math.PI / 2.8} color="#2563eb" />
-      <OrbitRing radius={4.2} speed={0.08} tilt={Math.PI / 6} color="#60a5fa" />
+      <OrbitRing radius={3.0} speed={0.18} tilt={Math.PI / 4} color="#3b82f6" />
+      <OrbitRing radius={3.5} speed={-0.12} tilt={Math.PI / 2.8} color="#2563eb" />
 
       {/* Floating URLs as canvas-texture sprites */}
-      <FloatingURLSprite text="short.ly/abc" baseAngle={0} radius={3.6} height={0.5} speed={0.22} />
-      <FloatingURLSprite text="go.link/x92" baseAngle={2.1} radius={3.5} height={-0.4} speed={-0.18} />
-      <FloatingURLSprite text="app.io/demo" baseAngle={4.2} radius={3.8} height={0.8} speed={0.15} />
+      <FloatingURLSprite text="short.ly/abc" baseAngle={0} radius={3.2} height={0.5} speed={0.22} />
+      <FloatingURLSprite text="go.link/x92" baseAngle={2.1} radius={3.1} height={-0.4} speed={-0.18} />
+      <FloatingURLSprite text="app.io/demo" baseAngle={4.2} radius={3.4} height={0.8} speed={0.15} />
 
       <OrbitControls
         enableZoom={false}
@@ -333,7 +332,7 @@ const GlobeScene = () => {
   return (
     <div ref={containerRef} className="w-full h-full">
       <Canvas
-        camera={{ position: [0, 0, 6], fov: 55 }}
+        camera={{ position: [0, 0, 7], fov: 55 }}
         dpr={[1, 1.5]}
         gl={{ antialias: true, alpha: true }}
         style={{ background: "transparent" }}
