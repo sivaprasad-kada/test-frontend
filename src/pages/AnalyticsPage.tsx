@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { MousePointerClick, Users, Globe, Loader2, ArrowLeft, Monitor, Smartphone } from "lucide-react";
+import { MousePointerClick, Users, Globe, Loader2, ArrowLeft, Monitor, Smartphone, RefreshCw } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { Button } from "@/components/ui/button";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
@@ -24,6 +24,8 @@ interface UrlItem {
   clicks: number;
 }
 
+const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
+
 const AnalyticsPage = () => {
   const { shortId } = useParams<{ shortId: string }>();
   const navigate = useNavigate();
@@ -32,22 +34,25 @@ const AnalyticsPage = () => {
   const [urlInfo, setUrlInfo] = useState<UrlItem | null>(null);
   const [urls, setUrls] = useState<UrlItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
   // Fetch all user URLs for the selector view
-  const fetchUserUrls = async () => {
+  const fetchUserUrls = useCallback(async () => {
     try {
       const res = await api.get("/url");
       setUrls(res.data);
     } catch (err: any) {
       if (err.response?.status === 401) navigate("/login");
     }
-  };
+  }, [navigate]);
 
   // Fetch analytics for a specific shortId
-  const fetchAnalytics = async (id: string) => {
-    setLoading(true);
+  const fetchAnalytics = useCallback(async (id: string, isRefresh = false) => {
+    if (!isRefresh) setLoading(true);
+    else setRefreshing(true);
     setError("");
+
     try {
       const [analyticsRes, urlsRes] = await Promise.all([
         api.get(`/url/${id}/analytics`),
@@ -60,21 +65,43 @@ const AnalyticsPage = () => {
     } catch (err: any) {
       if (err.response?.status === 401) {
         navigate("/login");
-      } else {
+      } else if (!isRefresh) {
         setError("Failed to load analytics data.");
       }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [navigate]);
 
+  // Initial fetch
   useEffect(() => {
     if (shortId) {
       fetchAnalytics(shortId);
     } else {
       fetchUserUrls().then(() => setLoading(false));
     }
-  }, [shortId]);
+  }, [shortId, fetchAnalytics, fetchUserUrls]);
+
+  // Auto-refresh analytics every 30 seconds
+  useEffect(() => {
+    if (!shortId) return;
+
+    const interval = setInterval(() => {
+      fetchAnalytics(shortId, true);
+    }, AUTO_REFRESH_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [shortId, fetchAnalytics]);
+
+  // Manual refresh
+  const handleRefresh = () => {
+    if (shortId) {
+      fetchAnalytics(shortId, true);
+    } else {
+      fetchUserUrls();
+    }
+  };
 
   // Aggregate analytics across all entries
   const totalClicks = analytics.reduce((s, a) => s + a.totalClicks, 0);
@@ -125,7 +152,12 @@ const AnalyticsPage = () => {
       <div className="flex min-h-screen bg-background">
         <DashboardSidebar />
         <main className="flex-1 p-6 md:p-10 overflow-auto">
-          <h1 className="text-3xl font-black text-foreground mb-2">Analytics</h1>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-3xl font-black text-foreground">Analytics</h1>
+            <Button variant="ghost" size="sm" onClick={handleRefresh} className="gap-2">
+              <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} /> Refresh
+            </Button>
+          </div>
           <p className="text-muted-foreground mb-8">Select a link to view its analytics</p>
 
           {loading ? (
@@ -150,7 +182,7 @@ const AnalyticsPage = () => {
                   <p className="text-xs text-muted-foreground mt-1 truncate" title={u.longUrl}>{u.longUrl}</p>
                   <div className="flex items-center gap-2 mt-3">
                     <MousePointerClick size={14} className="text-muted-foreground" />
-                    <span className="text-sm font-semibold text-foreground">{u.clicks?.toLocaleString() || 0} clicks</span>
+                    <span className="text-sm font-semibold text-foreground">{(u.clicks || 0).toLocaleString()} clicks</span>
                   </div>
                 </button>
               ))}
@@ -183,6 +215,9 @@ const AnalyticsPage = () => {
               </p>
             )}
           </div>
+          <Button variant="ghost" size="sm" onClick={handleRefresh} className="gap-2">
+            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} /> Refresh
+          </Button>
         </div>
 
         {loading ? (

@@ -11,6 +11,7 @@ const navItems = [
 
 const DashboardSidebar = () => {
   const location = useLocation();
+  // console.log("Current:", location);
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 

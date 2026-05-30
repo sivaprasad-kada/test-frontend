@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link2, MousePointerClick, Zap, Loader2, Trash2, ExternalLink, BarChart3 } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Link2, MousePointerClick, Zap, Loader2, Trash2, ExternalLink, BarChart3, RefreshCw } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
@@ -15,6 +15,8 @@ interface UrlItem {
   createdAt: string;
 }
 
+const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
+
 const DashboardPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -22,8 +24,16 @@ const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchUrls = async () => {
+  const backendBase = import.meta.env.VITE_API_URL
+    ? import.meta.env.VITE_API_URL.replace(/\/api$/, "")
+    : "http://localhost:5000";
+
+  const fetchUrls = useCallback(async (isRefresh = false) => {
+    if (!isRefresh) setLoading(true);
+    else setRefreshing(true);
+
     try {
       const res = await api.get("/url");
       setUrls(res.data);
@@ -31,17 +41,28 @@ const DashboardPage = () => {
     } catch (err: any) {
       if (err.response?.status === 401) {
         navigate("/login");
-      } else {
+      } else if (!isRefresh) {
         setError("Failed to fetch URLs.");
       }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [navigate]);
 
+  // Initial fetch
   useEffect(() => {
     fetchUrls();
-  }, []);
+  }, [fetchUrls]);
+
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchUrls(true);
+    }, AUTO_REFRESH_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [fetchUrls]);
 
   const handleDelete = async (shortId: string) => {
     setDeleting(shortId);
@@ -74,7 +95,6 @@ const DashboardPage = () => {
   ];
 
   const firstName = user?.name?.split(" ")[0] || "User";
-  const backendBase = "http://localhost:5000";
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -86,6 +106,9 @@ const DashboardPage = () => {
             <p className="text-muted-foreground mt-1">Here's what's happening with your links today.</p>
           </div>
           <div className="flex gap-3">
+            <Button variant="ghost" size="sm" onClick={() => fetchUrls(true)} className="gap-2">
+              <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} /> Refresh
+            </Button>
             <Button onClick={() => navigate("/shortener")}>+ Create New Link</Button>
           </div>
         </div>
@@ -177,7 +200,7 @@ const DashboardPage = () => {
                       <td className="py-4 text-muted-foreground max-w-[260px] truncate" title={link.longUrl}>
                         {link.longUrl}
                       </td>
-                      <td className="py-4 font-medium text-foreground">{link.clicks?.toLocaleString() || 0}</td>
+                      <td className="py-4 font-medium text-foreground">{(link.clicks || 0).toLocaleString()}</td>
                       <td className="py-4 text-muted-foreground text-xs">
                         {new Date(link.createdAt).toLocaleDateString()}
                       </td>

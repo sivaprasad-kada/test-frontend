@@ -26,6 +26,9 @@ const LoginPage = () => {
   const [regError, setRegError] = useState("");
   const [regLoading, setRegLoading] = useState(false);
 
+  // Backend base URL for OAuth
+  const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
   // If already logged in, redirect to dashboard
   if (user) return <Navigate to="/dashboard" replace />;
 
@@ -37,7 +40,12 @@ const LoginPage = () => {
       await login(loginEmail, loginPassword);
       navigate("/dashboard");
     } catch (err: any) {
-      setLoginError(err.response?.data?.error || "Login failed. Please try again.");
+      const errorData = err.response?.data;
+      if (errorData?.details && Array.isArray(errorData.details)) {
+        setLoginError(errorData.details.map((d: any) => d.message).join(". "));
+      } else {
+        setLoginError(errorData?.error || "Login failed. Please try again.");
+      }
     } finally {
       setLoginLoading(false);
     }
@@ -55,14 +63,19 @@ const LoginPage = () => {
       await register(regName, regEmail, regPassword);
       navigate("/dashboard");
     } catch (err: any) {
-      setRegError(err.response?.data?.error || "Registration failed. Please try again.");
+      const errorData = err.response?.data;
+      if (errorData?.details && Array.isArray(errorData.details)) {
+        setRegError(errorData.details.map((d: any) => d.message).join(". "));
+      } else {
+        setRegError(errorData?.error || "Registration failed. Please try again.");
+      }
     } finally {
       setRegLoading(false);
     }
   };
 
   const handleOAuth = (provider: "google" | "github") => {
-    window.location.href = `http://localhost:5000/api/auth/${provider}`;
+    window.location.href = `${apiBase}/auth/${provider}`;
   };
 
   return (

@@ -26,7 +26,10 @@ const ShortenerPage = () => {
   const [deleting, setDeleting] = useState<string | null>(null);
 
   const navigate = useNavigate();
-  const backendBase = "http://localhost:5000";
+
+  const backendBase = import.meta.env.VITE_API_URL
+    ? import.meta.env.VITE_API_URL.replace(/\/api$/, "")
+    : "http://localhost:5000";
 
   const fetchUrls = async () => {
     try {
@@ -55,7 +58,13 @@ const ShortenerPage = () => {
       // refresh the list
       fetchUrls();
     } catch (err: any) {
-      setCreateError(err.response?.data?.error || "Failed to create short URL.");
+      const errorData = err.response?.data;
+      // Handle Zod validation errors
+      if (errorData?.details && Array.isArray(errorData.details)) {
+        setCreateError(errorData.details.map((d: any) => d.message).join(". "));
+      } else {
+        setCreateError(errorData?.error || "Failed to create short URL.");
+      }
     } finally {
       setCreating(false);
     }
@@ -180,7 +189,7 @@ const ShortenerPage = () => {
                             {link.shortId} <ExternalLink size={12} />
                           </a>
                         </td>
-                        <td className="px-5 py-4 font-medium text-foreground">{link.clicks?.toLocaleString() || 0}</td>
+                        <td className="px-5 py-4 font-medium text-foreground">{(link.clicks || 0).toLocaleString()}</td>
                         <td className="px-5 py-4">
                           <div className="flex items-center justify-end gap-1">
                             <button
